@@ -29,27 +29,50 @@ module.exports = function(grunt) {
     return fileName.match(/\-\w{32}\./);
   };
   return grunt.registerMultiTask("assetFingerprint", "Generates asset fingerprints and appends to a rails manifest", function() {
-    var algorithm, cdnPrefixForRootPaths, filesToHashed, findAndReplaceFiles, keepOriginalFiles, manifestPath;
+    var algorithm,
+        includeOnly,
+        cdnPrefixForRootPaths,
+        findAndReplaceFiles,
+        keepOriginalFiles,
+        manifest = {},
+        manifestPath,
+        extensionIncluded; // boolean
+
     manifestPath = this.options({
       manifestPath: "dist/assets.json"
     }).manifestPath;
+    
     algorithm = this.options({
       algorithm: "md5"
     }).algorithm;
+
     findAndReplaceFiles = grunt.file.expand(this.options({
       findAndReplaceFiles: []
     }).findAndReplaceFiles);
+
     keepOriginalFiles = this.options({
       keepOriginalFiles: true
     }).keepOriginalFiles;
+
     cdnPrefixForRootPaths = this.options({
       cdnPrefixForRootPaths: ""
     }).cdnPrefixForRootPaths;
-    filesToHashed = {};
+
+    // include only extensions.
+    includeOnly = this.options({
+      includeOnly: []
+    }).includeOnly;
+
     _(this.files).each(function(files) {
-      var algorithmHash, content, dest, destWithHash, extension, src, substitution;
+      var algorithmHash, content, hashedName, extension, src;
+
       src = files.src[0];
-      dest = files.dest;
+            
+      
+
+      console.log('src', files.cwd);
+      console.log('src exists', grunt.file.exists(files.cwd + '/' + src));
+
       if (containsAFingerprint(src)) {
         return;
       }
@@ -59,40 +82,33 @@ module.exports = function(grunt) {
       if (!grunt.file.exists(src)) {
         grunt.log.warn("Source file `" + src + "` not found.");
       }
+
+      // generate hash.
       algorithmHash = crypto.createHash(algorithm);
-      extension = path.extname(dest);
+      extension = path.extname(src);
       content = grunt.file.read(src);
-      if (_(findAndReplaceFiles).contains(src)) {
-        findAndReplaceFiles = _(findAndReplaceFiles).without(src);
-        substitution = contentWithHashSubstitutions(src, filesToHashed, cdnPrefixForRootPaths);
-        if (substitution.madeAnyDifference) {
-          content = substitution.result;
-          grunt.file.write(src, content);
-          grunt.log.writeln("Applied fingerprinted paths to: " + src);
-        }
-      }
-      destWithHash = (path.dirname(dest)) + "/" + (path.basename(dest, extension)) + "-" + (algorithmHash.update(content).digest("hex")) + extension;
-      filesToHashed[stripDestPath(dest, files)] = stripDestPath(destWithHash, files);
-      if (keepOriginalFiles) {
-        grunt.file.copy(src, destWithHash);
-        return grunt.log.writeln("Copied: '" + src + "' to '" + destWithHash + "'");
-      } else {
-        fs.renameSync(src, destWithHash);
-        return grunt.log.writeln("Moved: '" + src + "' to '" + destWithHash + "'");
-      }
-    });
-    _(findAndReplaceFiles).each(function(file) {
-      var substitution;
-      if (!fs.existsSync(file)) {
-        return;
-      }
-      substitution = contentWithHashSubstitutions(file, filesToHashed, cdnPrefixForRootPaths);
-      if (substitution.madeAnyDifference) {
-        grunt.file.write(file, substitution.result);
-        return grunt.log.writeln("Fingerprinted paths: " + file);
+  
+      // console.log('content', content);
+
+      hashedName = (path.basename(src, extension)) + "-" + (algorithmHash.update(content).digest("hex")) + extension;
+
+      extensionIncluded = includeOnly.some(function (ext) {
+        return '.' + ext === extension;
+      });  
+      
+      if(extensionIncluded) {
+        // we need to have a key value pair of:
+        // {'a/b/file.js': 'file-dqpaiuc81Vs.js'}
+
+        // now we have both:
+        // 1. hashed name.
+        // 2. path.
+        // generate manifest list.
+        manifest[(path.basename(src, extension))] = hashedName;
       }
     });
-    fs.writeFileSync(manifestPath, JSON.stringify(filesToHashed, null, "  "));
-    return grunt.log.writeln("Recorded " + (_(filesToHashed).size()) + " asset mapping(s) to " + manifestPath);
+    console.log('manifest path', manifest);
+    fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, "  "));
+    return grunt.log.writeln("asset mapping(s) to " + manifestPath);
   });
 };
