@@ -29,7 +29,7 @@ module.exports = function(grunt) {
     return fileName.match(/\-\w{32}\./);
   };
   return grunt.registerMultiTask("assetFingerprint", "Generates asset fingerprints and appends to a rails manifest", function() {
-    var algorithm, cdnPrefixForRootPaths, filesToHashed, findAndReplaceFiles, keepOriginalFiles, manifestPath;
+    var algorithm, cdnPrefixForRootPaths, filesToHashed, findAndReplaceFiles, keepOriginalFiles, manifestPath, manifestNoPath;
     manifestPath = this.options({
       manifestPath: "dist/assets.json"
     }).manifestPath;
@@ -45,6 +45,9 @@ module.exports = function(grunt) {
     cdnPrefixForRootPaths = this.options({
       cdnPrefixForRootPaths: ""
     }).cdnPrefixForRootPaths;
+    manifestNoPath = this.options({
+      manifestNoPath: false
+    }).manifestNoPath;
     filesToHashed = {};
     _(this.files).each(function(files) {
       var algorithmHash, content, dest, destWithHash, extension, src, substitution;
@@ -92,7 +95,20 @@ module.exports = function(grunt) {
         return grunt.log.writeln("Fingerprinted paths: " + file);
       }
     });
-    fs.writeFileSync(manifestPath, JSON.stringify(filesToHashed, null, "  "));
+
+    // trim out path
+    if (manifestNoPath) {
+      var filesToHashedNoPath = {}
+      filesToHashedNoPath = _.each(filesToHashed, function (key, value, filesToHashedNoPath) {
+        var keySeg = key.split('/');
+        var valSeg = value.split('/');
+        var keyName = keySeg[keySeg.length - 1];
+        var valName = valSeg[valSeg.length - 1];
+        filesToHashedNoPath[keyName] = valName
+      });
+    }
+
+    fs.writeFileSync(manifestPath, JSON.stringify((manifestNoPath) ? filesToHashedNoPath : filesToHashed, null, "  "));
     return grunt.log.writeln("Recorded " + (_(filesToHashed).size()) + " asset mapping(s) to " + manifestPath);
   });
 };
