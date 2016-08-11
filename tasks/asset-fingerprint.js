@@ -1,5 +1,5 @@
 "use strict";
-var _, crypto, fs, path;
+var crypto, fs, path;
 
 fs = require("fs");
 
@@ -7,92 +7,89 @@ path = require("path");
 
 crypto = require("crypto");
 
-_ = require("lodash");
-
 module.exports = function(grunt) {
-  var containsAFingerprint, contentWithHashSubstitutions, stripDestPath;
-  stripDestPath = function(file, files) {
-    return file.replace(files.orig.dest + "/", "");
-  };
-  contentWithHashSubstitutions = function(file, hashMap, cdnPrefixForRootPaths) {
-    var originalContent, result;
-    originalContent = grunt.file.read(file);
-    result = _(hashMap).reduce(function(memo, hashedName, originalName) {
-      return memo.replace(RegExp("\\/" + originalName, "g"), cdnPrefixForRootPaths + "/" + hashedName).replace(RegExp("" + originalName, "g"), hashedName);
-    }, originalContent);
-    return {
-      result: result,
-      madeAnyDifference: result !== originalContent
-    };
-  };
+  var containsAFingerprint;
   containsAFingerprint = function(fileName) {
     return fileName.match(/\-\w{32}\./);
   };
   return grunt.registerMultiTask("assetFingerprint", "Generates asset fingerprints and appends to a rails manifest", function() {
-    var algorithm, cdnPrefixForRootPaths, filesToHashed, findAndReplaceFiles, keepOriginalFiles, manifestPath;
+    var algorithm,
+        includeOnly,
+        cdnPrefixForRootPaths,
+        findAndReplaceFiles,
+        keepOriginalFiles,
+        manifest = {},
+        manifestPath,
+        extensionIncluded; // boolean
+
     manifestPath = this.options({
       manifestPath: "dist/assets.json"
     }).manifestPath;
+    
     algorithm = this.options({
       algorithm: "md5"
     }).algorithm;
+
     findAndReplaceFiles = grunt.file.expand(this.options({
       findAndReplaceFiles: []
     }).findAndReplaceFiles);
+
     keepOriginalFiles = this.options({
       keepOriginalFiles: true
     }).keepOriginalFiles;
+
     cdnPrefixForRootPaths = this.options({
       cdnPrefixForRootPaths: ""
     }).cdnPrefixForRootPaths;
-    filesToHashed = {};
-    _(this.files).each(function(files) {
-      var algorithmHash, content, dest, destWithHash, extension, src, substitution;
-      src = files.src[0];
-      dest = files.dest;
-      if (containsAFingerprint(src)) {
-        return;
-      }
-      if (grunt.file.isDir(src)) {
-        return grunt.log.debug("Source file `" + src + "` was a directory. Skipping.");
-      }
-      if (!grunt.file.exists(src)) {
-        grunt.log.warn("Source file `" + src + "` not found.");
-      }
-      algorithmHash = crypto.createHash(algorithm);
-      extension = path.extname(dest);
-      content = grunt.file.read(src);
-      if (_(findAndReplaceFiles).contains(src)) {
-        findAndReplaceFiles = _(findAndReplaceFiles).without(src);
-        substitution = contentWithHashSubstitutions(src, filesToHashed, cdnPrefixForRootPaths);
-        if (substitution.madeAnyDifference) {
-          content = substitution.result;
-          grunt.file.write(src, content);
-          grunt.log.writeln("Applied fingerprinted paths to: " + src);
+
+    // include only extensions.
+    includeOnly = this.options({
+      includeOnly: []
+    }).includeOnly;
+
+
+
+    this.files.forEach(function(files) {
+      var algorithmHash, content, hashedName, extension, src;
+
+      files.src.forEach(function (src) {
+
+        // generate abs path with cwd and relative paths
+        var absPath = files.cwd + '/' + src;
+        if (containsAFingerprint(src)) {
+          return;
         }
-      }
-      destWithHash = (path.dirname(dest)) + "/" + (path.basename(dest, extension)) + "-" + (algorithmHash.update(content).digest("hex")) + extension;
-      filesToHashed[stripDestPath(dest, files)] = stripDestPath(destWithHash, files);
-      if (keepOriginalFiles) {
-        grunt.file.copy(src, destWithHash);
-        return grunt.log.writeln("Copied: '" + src + "' to '" + destWithHash + "'");
-      } else {
-        fs.renameSync(src, destWithHash);
-        return grunt.log.writeln("Moved: '" + src + "' to '" + destWithHash + "'");
-      }
+        if (grunt.file.isDir(absPath)) {
+          return grunt.log.debug("Source file `" + src + "` was a directory. Skipping.");
+        }
+        if (!grunt.file.exists(absPath)) {
+          grunt.log.warn("Source file `" + src + "` not found.");
+        }        
+        
+        algorithmHash = crypto.createHash(algorithm);
+        extension = path.extname(absPath);
+
+        // check if extension is included
+        extensionIncluded = includeOnly.some(function (ext) {
+          return '.' + ext === extension;
+        })
+
+        if (extensionIncluded) {
+          content = grunt.file.read(absPath);          
+          hashedName = (path.basename(absPath, extension)) + "-" + (algorithmHash.update(content).digest("hex")) + extension;
+
+          // generate key value pair like:
+          // {'a/b/file.js': 'file-dqpaiuc81Vs.js'}
+
+          // now we have both:
+          // 1. hashed name.
+          // 2. path.
+          // generate manifest list.
+          manifest[(path.basename(src, extension))] = hashedName;
+        }
+      });
     });
-    _(findAndReplaceFiles).each(function(file) {
-      var substitution;
-      if (!fs.existsSync(file)) {
-        return;
-      }
-      substitution = contentWithHashSubstitutions(file, filesToHashed, cdnPrefixForRootPaths);
-      if (substitution.madeAnyDifference) {
-        grunt.file.write(file, substitution.result);
-        return grunt.log.writeln("Fingerprinted paths: " + file);
-      }
-    });
-    fs.writeFileSync(manifestPath, JSON.stringify(filesToHashed, null, "  "));
-    return grunt.log.writeln("Recorded " + (_(filesToHashed).size()) + " asset mapping(s) to " + manifestPath);
+    fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, "  "));
+    return grunt.log.writeln("asset mapping(s) to " + manifestPath);
   });
 };
