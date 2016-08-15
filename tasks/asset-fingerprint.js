@@ -65,35 +65,8 @@ module.exports = function(grunt) {
       algorithmHash = crypto.createHash(algorithm);
       extension = path.extname(dest);
       content = grunt.file.read(src);
-      if (_(findAndReplaceFiles).contains(src)) {
-        findAndReplaceFiles = _(findAndReplaceFiles).without(src);
-        substitution = contentWithHashSubstitutions(src, filesToHashed, cdnPrefixForRootPaths);
-        if (substitution.madeAnyDifference) {
-          content = substitution.result;
-          grunt.file.write(src, content);
-          grunt.log.writeln("Applied fingerprinted paths to: " + src);
-        }
-      }
       destWithHash = (path.dirname(dest)) + "/" + (path.basename(dest, extension)) + "-" + (algorithmHash.update(content).digest("hex")) + extension;
       filesToHashed[stripDestPath(dest, files)] = stripDestPath(destWithHash, files);
-      if (keepOriginalFiles) {
-        grunt.file.copy(src, destWithHash);
-        return grunt.log.writeln("Copied: '" + src + "' to '" + destWithHash + "'");
-      } else {
-        fs.renameSync(src, destWithHash);
-        return grunt.log.writeln("Moved: '" + src + "' to '" + destWithHash + "'");
-      }
-    });
-    _(findAndReplaceFiles).each(function(file) {
-      var substitution;
-      if (!fs.existsSync(file)) {
-        return;
-      }
-      substitution = contentWithHashSubstitutions(file, filesToHashed, cdnPrefixForRootPaths);
-      if (substitution.madeAnyDifference) {
-        grunt.file.write(file, substitution.result);
-        return grunt.log.writeln("Fingerprinted paths: " + file);
-      }
     });
 
     // trim out path
