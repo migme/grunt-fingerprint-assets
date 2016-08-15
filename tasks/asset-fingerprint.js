@@ -81,7 +81,7 @@ module.exports = function(grunt) {
     }
     var manifestList = (manifestNoPath) ? filesToHashedNoPath : filesToHashed;
 
-    fs.writeFileSync(manifestPath, JSON.stringify(manifestList, null, "  "));
+    fs.writeFileSync(manifestPath, 'window.hashMap=' + JSON.stringify(manifestList, null, "  "));
     return grunt.log.writeln("Recorded " + (_(filesToHashed).size()) + " asset mapping(s) to " + manifestPath);
   });
 };
