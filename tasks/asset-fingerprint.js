@@ -99,14 +99,14 @@ module.exports = function(grunt) {
     // trim out path
     if (manifestNoPath) {
       var filesToHashedNoPath = {}
-      Object.keys(filesToHashed).forEach(function(val, index) {
-        var valSeg = val.split('/');
-        var valName = valSeg[valSeg.length-1]
-        filesToHashedNoPath[val] = valName
+      Object.keys(filesToHashed).forEach(function(name, index) {
+        var nameSeg = filesToHashed[name].split('/');
+        var trimPathName = nameSeg[nameSeg.length-1];
+        var hashCode = trimPathName.replace(/.*\-(.*)(\..*)$/g, function ($0, $1, $2) { return $1 });
+        filesToHashedNoPath[name] = hashCode;
       })
     }
-
-    var manifestList = (manifestNoPath) ? filesToHashedNoPath : filesToHashed
+    var manifestList = (manifestNoPath) ? filesToHashedNoPath : filesToHashed;
 
     fs.writeFileSync(manifestPath, JSON.stringify(manifestList, null, "  "));
     return grunt.log.writeln("Recorded " + (_(filesToHashed).size()) + " asset mapping(s) to " + manifestPath);
