@@ -4,7 +4,7 @@
 
 ### Overview
 
-This plugin is originated from [here](https://github.com/migme/grunt-fingerprint-assets). Bryan Huang (I specify the name of the person to blame.) modified it to serve the purpose of both browser caching `javascript files` and free up *CDN*. We plan to use *filename{hash_code}* for version controlling instead of copying everything to *CDN* after every *jenkin* jobs that jacks up spaces in *CDN*. We only replace the hash that code is different from the previous version.
+This plugin is originated from [here](https://github.com/migme/grunt-fingerprint-assets). Bryan Huang (I specify the name of the person to blame.) modified it to serve the purposes of both browser caching *javascript files* and free up *CDN* space. We plan to use *filename{hash_code}* for version controlling instead of copying everything to *CDN* after every *jenkin* jobs that jacks up spaces in *CDN*. We only replace the hash that code is different from the previous version.
 
 ### What does it do
 
