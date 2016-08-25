@@ -25,6 +25,7 @@ generate a *hashMap* js script which exports a `filepath: {hash_code}` map:
 assetFingerprint: {
   "options": {
     "manifestPath": "dist/hashMap.js" // generates hashMap.js to dist folder.
+    "manifestNoPath": true // only keep the hash part of the filename
   },
   "dist": {
     "files": [
